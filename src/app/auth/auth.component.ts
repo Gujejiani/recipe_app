@@ -1,19 +1,32 @@
-import { Component, ViewChild } from "@angular/core";
+import {
+  Component,
+  ComponentFactoryResolver,
+  OnDestroy,
+  ViewChild,
+} from "@angular/core";
 import { NgForm } from "@angular/forms";
 import { Router } from "@angular/router";
-import { Observable } from "rxjs";
+import { Observable, Subscription } from "rxjs";
+import { AlertComponent } from "../shared/alert/alert.component";
+import { PlaceHolderDirective } from "../shared/placeholder/placeholder";
 import { AuthService } from "./auth.service";
 import { AuthResponseData } from "./auth.service";
 @Component({
   selector: "app-auth",
   templateUrl: "./auth.component.html",
 })
-export class AuthComponent {
+export class AuthComponent implements OnDestroy {
   isLoginMode = true;
   isLoading = false;
   errorMessage: string = "";
+  closeSub: Subscription;
   @ViewChild("form") formData: NgForm;
-  constructor(private authService: AuthService, private router: Router) {}
+  @ViewChild(PlaceHolderDirective) alertHost: PlaceHolderDirective;
+  constructor(
+    private authService: AuthService,
+    private router: Router,
+    private componentFactoryResolver: ComponentFactoryResolver
+  ) {}
   onSwitchMode() {
     this.isLoginMode = !this.isLoginMode;
   }
@@ -38,11 +51,35 @@ export class AuthComponent {
       (errorMessage) => {
         this.isLoading = false;
         this.errorMessage = errorMessage;
-
+        this.showErrorAlert(errorMessage);
         console.log(errorMessage);
       }
     );
 
     this.formData.reset();
+  }
+  closeModal() {
+    this.errorMessage = "";
+  }
+  private showErrorAlert(message: string) {
+    const alertCmpFactory = this.componentFactoryResolver.resolveComponentFactory(
+      AlertComponent
+    );
+
+    const hostViewContainerRef = this.alertHost.viewContainerRef;
+
+    hostViewContainerRef.clear();
+    const componentRef = hostViewContainerRef.createComponent(alertCmpFactory);
+
+    componentRef.instance.message = message;
+    this.closeSub = componentRef.instance.closeModal.subscribe((data) => {
+      this.closeSub.unsubscribe();
+      hostViewContainerRef.clear();
+    });
+  }
+  ngOnDestroy() {
+    if (this.closeSub) {
+      this.closeSub.unsubscribe();
+    }
   }
 }
